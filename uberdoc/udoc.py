@@ -105,7 +105,10 @@ class Uberdoc:
                 "conf": user_conf_items
             }
 
-            template = env.get_template(input_file)
+            # windows fix
+            # jinja templates require the filename to use forward instead of backslashes
+            template = env.get_template(input_file.replace("\\", "/"))
+            # end windows fix
             content = template.render(template_vars)
             complete_input_file = os.path.join(self.out_dir, self.conf["in_dir"], input_file)
 
@@ -140,7 +143,10 @@ class Uberdoc:
             file_list,
             "-o",
             out_file + ".html"])
-        self.cmd(build_cmd, cwd=pandoc_wd, verbose=verbose)
+        # windows fix
+        # we need to escape backspace characters if these should be transferred properly to the command line env
+        self.cmd(build_cmd.replace("\\", "\\\\"), cwd=pandoc_wd, verbose=verbose)
+        # end windows fix
 
         # build pdf in addition, if required (takes a lot longer)
         if pdf:
@@ -161,7 +167,10 @@ class Uberdoc:
                                  file_list,
                                  "-o",
                                  out_file + ".pdf"])
-            self.cmd(build_cmd, cwd=pandoc_wd, verbose=verbose)
+            # windows fix
+            # we need to escape backspace characters if these should be transferred properly to the command line env
+            self.cmd(build_cmd.replace("\\", "\\\\"), cwd=pandoc_wd, verbose=verbose)
+            # end windows fix
 
     def clean(self, recreate_out=False):
         """Recreates out_dir"""
@@ -309,7 +318,9 @@ class Uberdoc:
 
     def _find_closest_git_dir(self, startdir):
         currentdir = path.abspath(startdir)
-        while currentdir != "/":
+        # windows fix use os.path.abspath(os.sep) instead of "/"
+		# according to http://stackoverflow.com/questions/12041525/a-system-independent-way-using-python-to-get-the-root-directory-drive-on-which-p
+        while currentdir != os.path.abspath(os.sep):
             if path.isdir(path.join(currentdir, ".git")):
                 return path.join(currentdir, ".git")
             currentdir = path.abspath(path.join(currentdir, os.pardir))
@@ -334,10 +345,19 @@ class Uberdoc:
         file_html = path.join(
             self.out_dir, self.conf["doc_filename"] + ".html")
         file_pdf = path.join(self.out_dir, self.conf["doc_filename"] + ".pdf")
-        # on windows this should be
-        # os.startfile(file_html)
-        self.cmd("open " + file_html)
-        if path.isfile(file_pdf):
+
+		# windows fix
+        # use startfile if nt environment, otherwise launch cmd
+        if os.name == 'nt':
+			os.startfile(file_html)
+        else:
+            self.cmd("open " + file_html)
+
+		# windows fix
+        # use startfile if nt environment, otherwise launch cmd
+        if os.name == 'nt' and path.isfile(file_pdf):
+            os.startfile(file_pdf)
+        elif path.isfile(file_pdf):
             self.cmd("open " + file_pdf)
 
     def init_doc(self):
